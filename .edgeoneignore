@@ -1,0 +1,23 @@
+# Node modules
+node_modules
+backend
+src
+sql
+target
+
+# Environment files
+.env
+.env.local
+
+# Git
+.git
+.gitignore
+
+# Lock files
+Cargo.lock
+Cargo.toml
+
+# Documentation
+README.md
+DEPLOYMENT.md
+backend/

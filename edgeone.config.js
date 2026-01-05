@@ -14,16 +14,16 @@ export default {
     route: '/',
   },
 
-  // 函数配置（优先级更高）
+  // 函数配置 - 使用专门的处理器
   functions: {
     // API 路由
     api: {
-      handler: 'node-functions/index.js',
+      handler: 'node-functions/api.js',
       route: '/api',
     },
     // Identity 路由
     identity: {
-      handler: 'node-functions/index.js',
+      handler: 'node-functions/identity.js',
       route: '/identity',
     },
   },

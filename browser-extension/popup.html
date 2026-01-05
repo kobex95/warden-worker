@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warden 密码管理器</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 400px;
+            min-height: 500px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .login-view, .vault-view, .settings-view {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 12px;
+            width: auto;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .vault-item {
+            background: #f8f9fa;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .vault-item:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .vault-item h3 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .vault-item p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .search-box {
+            margin-bottom: 15px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            padding: 0 20px;
+            border-bottom: 1px solid #e1e8ed;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔐 Warden</h1>
+        <p>密码管理器扩展</p>
+    </div>
+
+    <div class="tab-buttons">
+        <button class="tab-btn active" onclick="showVaultTab()">密码库</button>
+        <button class="tab-btn" onclick="showSettingsTab()">设置</button>
+    </div>
+
+    <!-- Login View -->
+    <div id="loginView" class="login-view">
+        <div id="loginError" class="error hidden"></div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label>邮箱</label>
+                <input type="email" id="email" required>
+            </div>
+            <div class="form-group">
+                <label>主密码</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit" class="btn">登录</button>
+        </form>
+    </div>
+
+    <!-- Vault View -->
+    <div id="vaultView" class="vault-view hidden">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="搜索密码项..." oninput="searchVault()">
+        </div>
+        <div id="vaultList"></div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="settingsView" class="settings-view hidden">
+        <div class="form-group">
+            <label>服务器地址</label>
+            <input type="text" id="serverUrl" value="https://jxngfaycacjetpiqttwb.supabase.co">
+        </div>
+        <div class="form-group">
+            <label>API 密钥</label>
+            <input type="text" id="apiKey" value="sb_publishable_Nwca-b4HH9JFDInZgyrAuQ_C0wsGnhs">
+        </div>
+        <button class="btn" onclick="saveSettings()">保存设置</button>
+        <button class="btn btn-secondary" onclick="logout()" style="margin-top: 10px;">退出登录</button>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
