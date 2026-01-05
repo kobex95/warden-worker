@@ -431,7 +431,10 @@
         <div id="vaultView" class="hidden vault-container">
             <div class="vault-header">
                 <h2>🔐 我的密码库</h2>
-                <button class="logout-btn" onclick="logout()">退出登录</button>
+                <div>
+                    <button class="logout-btn" onclick="showFolders()" style="margin-right: 8px;">📁 文件夹</button>
+                    <button class="logout-btn" onclick="logout()">退出</button>
+                </div>
             </div>
 
             <div class="search-box">
@@ -443,7 +446,7 @@
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn" onclick="addNewItem()">+ 添加新密码</button>
+                <button class="btn" onclick="showAddItemModal()">+ 添加新密码</button>
                 <button class="btn btn-secondary" onclick="showPasswordGenerator()">🎲 生成密码</button>
             </div>
         </div>
@@ -457,8 +460,52 @@
                 </div>
                 <div id="modalContent"></div>
                 <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="editCipher()">编辑</button>
+                    <button class="btn btn-secondary" onclick="toggleFavorite()">⭐ 收藏</button>
                     <button class="btn btn-secondary" onclick="deleteCipher()">删除</button>
                     <button class="btn" onclick="closeModal()">关闭</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Password Modal -->
+        <div id="itemModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="itemModalTitle">添加密码</h3>
+                    <button class="close-modal" onclick="closeItemModal()">&times;</button>
+                </div>
+                <div id="itemModalContent">
+                    <div class="form-group">
+                        <label for="itemName">名称 *</label>
+                        <input type="text" id="itemName" required placeholder="例如：Google 账号">
+                    </div>
+                    <div class="form-group">
+                        <label for="itemUsername">用户名 *</label>
+                        <input type="text" id="itemUsername" required placeholder="用户名或邮箱">
+                    </div>
+                    <div class="form-group">
+                        <label for="itemPassword">密码 *</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="itemPassword" required placeholder="输入密码">
+                            <button type="button" class="btn btn-secondary" onclick="generateForInput()">生成</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="itemNotes">备注</label>
+                        <input type="text" id="itemNotes" placeholder="可选备注信息">
+                    </div>
+                    <div class="form-group">
+                        <label for="itemFolder">文件夹</label>
+                        <select id="itemFolder" style="width: 100%; padding: 12px; border: 2px solid #e1e8ed; border-radius: 8px;">
+                            <option value="">无文件夹</option>
+                        </select>
+                    </div>
+                    <div id="passwordStrength" style="margin-bottom: 20px; font-size: 14px;"></div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn" onclick="saveCipher()">保存</button>
+                    <button class="btn btn-secondary" onclick="closeItemModal()">取消</button>
                 </div>
             </div>
         </div>
@@ -495,6 +542,26 @@
                 </div>
             </div>
         </div>
+
+        <!-- Folders Modal -->
+        <div id="foldersModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📁 文件夹管理</h3>
+                    <button class="close-modal" onclick="closeFolders()">&times;</button>
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="newFolderName">新建文件夹</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="newFolderName" placeholder="文件夹名称">
+                        <button class="btn" onclick="createFolder()">创建</button>
+                    </div>
+                </div>
+                <div id="foldersContent" class="vault-list">
+                    <div class="empty-vault">加载中...</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -516,6 +583,8 @@
         let currentUser = null;
         let currentCipher = null;
         let allCiphers = [];
+        let allFolders = [];
+        let isEditing = false;
 
         // Show/Hide Forms
         function showLoginForm() {
@@ -702,7 +771,8 @@
                     console.error('Load vault error:', ciphersError || foldersError);
                     vaultContent.innerHTML = '<div class="empty-vault">加载失败，请刷新页面</div>';
                 } else {
-                    displayVault({ Ciphers: ciphers || [], Folders: folders || [] });
+                    allFolders = folders || [];
+                    displayVault({ Ciphers: ciphers || [], Folders: allFolders });
                 }
             } catch (error) {
                 console.error('Load vault error:', error);
@@ -732,10 +802,19 @@
 
             vaultContent.innerHTML = ciphers.map(cipher => {
                 const cipherData = typeof cipher.data === 'string' ? JSON.parse(cipher.data) : cipher.data;
+                const folder = cipher.folder_id ? allFolders.find(f => f.id === cipher.folder_id) : null;
+
                 return `
                     <div class="vault-item" onclick="viewCipher('${cipher.id}')">
-                        <h3>${cipherData.name || '未命名'}</h3>
-                        <p>${cipherData.login?.username || '无用户名'}</p>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <h3 style="display: flex; align-items: center; gap: 8px;">
+                                    ${cipher.favorite ? '⭐' : ''} ${cipherData.name || '未命名'}
+                                </h3>
+                                <p>${cipherData.login?.username || '无用户名'}</p>
+                                ${folder ? `<p style="font-size: 12px; color: #999;">📁 ${folder.name}</p>` : ''}
+                            </div>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -913,26 +992,74 @@
             await copyToClipboard(password);
         }
 
-        // Add New Item
-        async function addNewItem() {
-            const name = prompt('输入密码项名称：');
-            if (!name) return;
+        // Show Add Item Modal
+        function showAddItemModal() {
+            isEditing = false;
+            document.getElementById('itemModalTitle').textContent = '添加密码';
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemUsername').value = '';
+            document.getElementById('itemPassword').value = '';
+            document.getElementById('itemNotes').value = '';
+            document.getElementById('passwordStrength').textContent = '';
+            loadFolderOptions();
+            document.getElementById('itemModal').classList.remove('hidden');
+        }
 
-            const username = prompt('输入用户名：');
-            const password = prompt('输入密码：');
+        // Close Item Modal
+        function closeItemModal() {
+            document.getElementById('itemModal').classList.add('hidden');
+            isEditing = false;
+        }
 
-            if (!username || !password) {
-                alert('用户名和密码不能为空');
+        // Load Folder Options
+        function loadFolderOptions() {
+            const select = document.getElementById('itemFolder');
+            select.innerHTML = '<option value="">无文件夹</option>';
+            allFolders.forEach(folder => {
+                const option = document.createElement('option');
+                option.value = folder.id;
+                option.textContent = folder.name;
+                select.appendChild(option);
+            });
+        }
+
+        // Password Strength Checker
+        function checkPasswordStrength(password) {
+            if (!password) return '';
+
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (password.length >= 12) strength++;
+            if (/[a-z]/.test(password)) strength++;
+            if (/[A-Z]/.test(password)) strength++;
+            if (/[0-9]/.test(password)) strength++;
+            if (/[^a-zA-Z0-9]/.test(password)) strength++;
+
+            const levels = ['非常弱', '弱', '一般', '强', '很强', '非常强'];
+            const colors = ['#c33', '#c66', '#cc3', '#3c3', '#3cc', '#33c'];
+            const index = Math.min(strength - 1, 5);
+
+            return `<span style="color: ${colors[index]}; font-weight: 600;">密码强度: ${levels[index] || '未评级'}</span>`;
+        }
+
+        // Save Cipher (Add or Edit)
+        async function saveCipher() {
+            const name = document.getElementById('itemName').value.trim();
+            const username = document.getElementById('itemUsername').value.trim();
+            const password = document.getElementById('itemPassword').value.trim();
+            const notes = document.getElementById('itemNotes').value.trim() || null;
+            const folderId = document.getElementById('itemFolder').value || null;
+
+            if (!name || !username || !password) {
+                alert('名称、用户名和密码不能为空');
                 return;
             }
 
             try {
                 const now = new Date().toISOString();
-                const cipherId = crypto.randomUUID();
-
                 const cipherData = {
                     name: name,
-                    notes: null,
+                    notes: notes,
                     login: { username: username, password: password },
                     card: null,
                     identity: null,
@@ -942,38 +1069,263 @@
                     reprompt: null
                 };
 
+                if (isEditing && currentCipher) {
+                    // Update existing cipher
+                    const { error } = await supabaseClient
+                        .from('ciphers')
+                        .update({
+                            data: JSON.stringify(cipherData),
+                            folder_id: folderId,
+                            updated_at: now
+                        })
+                        .eq('id', currentCipher.id);
+
+                    if (error) {
+                        alert('更新失败：' + error.message);
+                    } else {
+                        alert('更新成功！');
+                        closeItemModal();
+                        closeModal();
+                        loadVault();
+                    }
+                } else {
+                    // Create new cipher
+                    const cipherId = crypto.randomUUID();
+                    const { error } = await supabaseClient
+                        .from('ciphers')
+                        .insert({
+                            id: cipherId,
+                            user_id: currentUser.id,
+                            organization_id: null,
+                            type: 1,
+                            data: JSON.stringify(cipherData),
+                            favorite: false,
+                            folder_id: folderId,
+                            deleted_at: null,
+                            created_at: now,
+                            updated_at: now
+                        });
+
+                    if (error) {
+                        alert('添加失败：' + error.message);
+                    } else {
+                        alert('添加成功！');
+                        closeItemModal();
+                        loadVault();
+                    }
+                }
+            } catch (error) {
+                alert('操作失败：' + error.message);
+            }
+        }
+
+        // Edit Cipher
+        function editCipher() {
+            if (!currentCipher) return;
+
+            closeModal();
+            isEditing = true;
+            document.getElementById('itemModalTitle').textContent = '编辑密码';
+
+            const cipherData = typeof currentCipher.data === 'string' ? JSON.parse(currentCipher.data) : currentCipher.data;
+
+            document.getElementById('itemName').value = cipherData.name || '';
+            document.getElementById('itemUsername').value = cipherData.login?.username || '';
+            document.getElementById('itemPassword').value = cipherData.login?.password || '';
+            document.getElementById('itemNotes').value = cipherData.notes || '';
+            document.getElementById('passwordStrength').textContent = checkPasswordStrength(cipherData.login?.password || '');
+
+            loadFolderOptions();
+            document.getElementById('itemFolder').value = currentCipher.folder_id || '';
+
+            document.getElementById('itemModal').classList.remove('hidden');
+        }
+
+        // Toggle Favorite
+        async function toggleFavorite() {
+            if (!currentCipher) return;
+
+            try {
+                const newFavorite = !currentCipher.favorite;
                 const { error } = await supabaseClient
                     .from('ciphers')
-                    .insert({
-                        id: cipherId,
-                        user_id: currentUser.id,
-                        organization_id: null,
-                        type: 1,
-                        data: JSON.stringify(cipherData),
-                        favorite: false,
-                        folder_id: null,
-                        deleted_at: null,
-                        created_at: now,
-                        updated_at: now
-                    });
+                    .update({ favorite: newFavorite })
+                    .eq('id', currentCipher.id);
 
                 if (error) {
-                    console.error('Add cipher error:', error);
-                    alert('添加失败：' + error.message);
+                    alert('操作失败：' + error.message);
                 } else {
-                    alert('添加成功！');
+                    alert(newFavorite ? '已添加到收藏' : '已取消收藏');
+                    currentCipher.favorite = newFavorite;
+                    closeModal();
                     loadVault();
                 }
             } catch (error) {
-                console.error('Add cipher error:', error);
-                alert('添加失败：' + error.message);
+                alert('操作失败：' + error.message);
             }
         }
+
+        // Generate Password for Input
+        function generateForInput() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+            let password = '';
+            const array = new Uint32Array(16);
+            crypto.getRandomValues(array);
+            for (let i = 0; i < 16; i++) {
+                password += chars[array[i] % chars.length];
+            }
+            document.getElementById('itemPassword').value = password;
+            document.getElementById('passwordStrength').textContent = checkPasswordStrength(password);
+        }
+
+        // Add password strength listener
+        document.addEventListener('DOMContentLoaded', () => {
+            const passwordInput = document.getElementById('itemPassword');
+            if (passwordInput) {
+                passwordInput.addEventListener('input', (e) => {
+                    document.getElementById('passwordStrength').textContent = checkPasswordStrength(e.target.value);
+                });
+            }
+        });
 
         // Logout
         function logout() {
             currentUser = null;
             showLoginForm();
+        }
+
+        // Show Folders Modal
+        async function showFolders() {
+            document.getElementById('foldersModal').classList.remove('hidden');
+            await loadFolders();
+        }
+
+        // Close Folders Modal
+        function closeFolders() {
+            document.getElementById('foldersModal').classList.add('hidden');
+        }
+
+        // Load Folders
+        async function loadFolders() {
+            const foldersContent = document.getElementById('foldersContent');
+            foldersContent.innerHTML = '<div class="empty-vault">加载中...</div>';
+
+            try {
+                const { data: folders, error } = await supabaseClient
+                    .from('folders')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+
+                if (error) {
+                    foldersContent.innerHTML = '<div class="empty-vault">加载失败</div>';
+                } else {
+                    allFolders = folders || [];
+                    displayFolders();
+                }
+            } catch (error) {
+                foldersContent.innerHTML = '<div class="empty-vault">加载失败</div>';
+            }
+        }
+
+        // Display Folders
+        function displayFolders() {
+            const foldersContent = document.getElementById('foldersContent');
+
+            if (!allFolders || allFolders.length === 0) {
+                foldersContent.innerHTML = `
+                    <div class="empty-vault">
+                        <p>📭 暂无文件夹</p>
+                        <p style="margin-top: 8px; font-size: 14px;">在上方创建新文件夹</p>
+                    </div>
+                `;
+                return;
+            }
+
+            foldersContent.innerHTML = allFolders.map(folder => {
+                const cipherCount = allCiphers.filter(c => c.folder_id === folder.id).length;
+                return `
+                    <div class="vault-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3>📁 ${folder.name}</h3>
+                                <p>${cipherCount} 个密码项</p>
+                            </div>
+                            <button class="btn btn-secondary" onclick="deleteFolder('${folder.id}', '${folder.name}')" style="width: auto; padding: 8px 16px; margin: 0;">删除</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Create Folder
+        async function createFolder() {
+            const name = document.getElementById('newFolderName').value.trim();
+
+            if (!name) {
+                alert('请输入文件夹名称');
+                return;
+            }
+
+            try {
+                const now = new Date().toISOString();
+                const folderId = crypto.randomUUID();
+
+                const { error } = await supabaseClient
+                    .from('folders')
+                    .insert({
+                        id: folderId,
+                        user_id: currentUser.id,
+                        name: name,
+                        created_at: now,
+                        updated_at: now
+                    });
+
+                if (error) {
+                    alert('创建失败：' + error.message);
+                } else {
+                    alert('创建成功！');
+                    document.getElementById('newFolderName').value = '';
+                    await loadFolders();
+                }
+            } catch (error) {
+                alert('创建失败：' + error.message);
+            }
+        }
+
+        // Delete Folder
+        async function deleteFolder(folderId, folderName) {
+            if (!confirm(`确定要删除文件夹 "${folderName}" 吗？文件夹内的密码将变为无分类。`)) {
+                return;
+            }
+
+            try {
+                // Update ciphers to remove folder_id
+                const { error: updateError } = await supabaseClient
+                    .from('ciphers')
+                    .update({ folder_id: null })
+                    .eq('folder_id', folderId);
+
+                if (updateError) {
+                    alert('更新密码失败：' + updateError.message);
+                    return;
+                }
+
+                // Delete folder
+                const { error } = await supabaseClient
+                    .from('folders')
+                    .delete()
+                    .eq('id', folderId);
+
+                if (error) {
+                    alert('删除失败：' + error.message);
+                } else {
+                    alert('删除成功！');
+                    await loadFolders();
+                    loadVault();
+                }
+            } catch (error) {
+                alert('删除失败：' + error.message);
+            }
         }
 
         // Initialize
