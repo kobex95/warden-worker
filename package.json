@@ -1,0 +1,14 @@
+{
+  "name": "warden-edgeone",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "edgeone dev",
+    "build": "edgeone build",
+    "deploy": "edgeone deploy"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
