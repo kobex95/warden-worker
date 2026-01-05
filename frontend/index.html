@@ -128,11 +128,6 @@
             display: none;
         }
 
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
-        }
-
         .error {
             background: #fee;
             color: #c33;
@@ -140,6 +135,7 @@
             border-radius: 8px;
             margin-bottom: 20px;
             font-size: 14px;
+            word-break: break-word;
         }
 
         .success {
@@ -151,7 +147,6 @@
             font-size: 14px;
         }
 
-        /* Vault styles */
         .vault-container {
             max-width: 800px;
         }
@@ -290,7 +285,7 @@
     </div>
 
     <script>
-        // API Configuration - 使用相对路径，自动适配 EdgeOne 域名
+        // API Configuration - 使用相对路径
         const API_URL = window.location.origin;
 
         // DOM Elements
@@ -324,45 +319,33 @@
             loadVault();
         }
 
-        // Login Handler
-        loginFormElement.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        // Helper function to show error
+        function showError(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.classList.remove('hidden');
+            console.error(message);
+        }
 
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            const errorDiv = document.getElementById('loginError');
-
+        // Test API connection
+        async function testApiConnection() {
             try {
-                const response = await fetch(`${API_URL}/identity/connect/token`, {
-                    method: 'POST',
+                console.log('Testing API connection to:', API_URL + '/api/health');
+                const response = await fetch(API_URL + '/api/health', {
+                    method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        grant_type: 'password',
-                        username: email,
-                        password: password
-                    })
+                    }
                 });
-
+                console.log('Health check response:', response.status, response.statusText);
                 const data = await response.json();
-
-                if (response.ok) {
-                    localStorage.setItem('access_token', data.access_token);
-                    localStorage.setItem('refresh_token', data.refresh_token);
-                    accessToken = data.access_token;
-                    refreshToken = data.refresh_token;
-                    showVault();
-                } else {
-                    errorDiv.textContent = data.error || '登录失败';
-                    errorDiv.classList.remove('hidden');
-                }
+                console.log('Health check data:', data);
+                return response.ok;
             } catch (error) {
-                console.error('Login error:', error);
-                errorDiv.textContent = '网络错误，请稍后重试';
-                errorDiv.classList.remove('hidden');
+                console.error('API connection test failed:', error);
+                return false;
             }
-        });
+        }
 
         // Register Handler
         registerFormElement.addEventListener('submit', async (e) => {
@@ -375,61 +358,119 @@
             const errorDiv = document.getElementById('registerError');
             const successDiv = document.getElementById('registerSuccess');
 
+            // Clear previous messages
+            errorDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+
             // Validation
             if (password !== confirmPassword) {
-                errorDiv.textContent = '两次输入的密码不一致';
-                errorDiv.classList.remove('hidden');
+                showError('registerError', '两次输入的密码不一致');
                 return;
             }
 
             if (password.length < 8) {
-                errorDiv.textContent = '密码至少需要8个字符';
-                errorDiv.classList.remove('hidden');
+                showError('registerError', '密码至少需要8个字符');
                 return;
             }
 
             try {
-                // For simplicity, we're using a basic registration flow
-                // In a real Bitwarden client, this would involve complex crypto operations
-                const response = await fetch(`${API_URL}/identity/accounts/register/finish`, {
+                // Test API first
+                const apiOk = await testApiConnection();
+                if (!apiOk) {
+                    showError('registerError', '无法连接到服务器，请检查网络或稍后重试');
+                    return;
+                }
+
+                console.log('Registering user:', email);
+                console.log('API URL:', API_URL + '/identity/accounts/register/finish');
+
+                const registerData = {
+                    name: name || null,
+                    email: email,
+                    masterPasswordHash: password,
+                    masterPasswordHint: null,
+                    userSymmetricKey: 'demo-key-' + Date.now(),
+                    userAsymmetricKeys: {
+                        publicKey: 'demo-public-key-' + Date.now(),
+                        encryptedPrivateKey: 'demo-private-key-' + Date.now()
+                    },
+                    kdf: 0,
+                    kdfIterations: 600000
+                };
+
+                console.log('Request payload:', registerData);
+
+                const response = await fetch(API_URL + '/identity/accounts/register/finish', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        name: name || null,
-                        email: email,
-                        masterPasswordHash: password, // Simplified for demo
-                        masterPasswordHint: null,
-                        userSymmetricKey: 'demo-key',
-                        userAsymmetricKeys: {
-                            publicKey: 'demo-public-key',
-                            encryptedPrivateKey: 'demo-private-key'
-                        },
-                        kdf: 0,
-                        kdfIterations: 600000
-                    })
+                    body: JSON.stringify(registerData)
                 });
+
+                console.log('Register response status:', response.status);
+                console.log('Register response ok:', response.ok);
+
+                const data = await response.json();
+                console.log('Register response data:', data);
 
                 if (response.ok) {
                     successDiv.textContent = '注册成功！请登录';
                     successDiv.classList.remove('hidden');
-                    errorDiv.classList.add('hidden');
 
                     setTimeout(() => {
                         showLoginForm();
                         successDiv.classList.add('hidden');
                     }, 2000);
                 } else {
-                    const data = await response.json();
-                    errorDiv.textContent = data.error || '注册失败';
-                    errorDiv.classList.remove('hidden');
-                    successDiv.classList.add('hidden');
+                    showError('registerError', data.error || '注册失败：' + response.statusText);
                 }
             } catch (error) {
                 console.error('Register error:', error);
-                errorDiv.textContent = '网络错误，请稍后重试';
-                errorDiv.classList.remove('hidden');
+                showError('registerError', '网络错误：' + error.message);
+            }
+        });
+
+        // Login Handler
+        loginFormElement.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+
+            errorDiv.classList.add('hidden');
+
+            try {
+                console.log('Logging in:', email);
+
+                const response = await fetch(API_URL + '/identity/connect/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        grant_type: 'password',
+                        username: email,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Login response:', data);
+
+                if (response.ok) {
+                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem('refresh_token', data.refresh_token);
+                    accessToken = data.access_token;
+                    refreshToken = data.refresh_token;
+                    showVault();
+                } else {
+                    showError('loginError', data.error || '登录失败');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('loginError', '网络错误：' + error.message);
             }
         });
 
@@ -438,7 +479,7 @@
             const vaultContent = document.getElementById('vaultContent');
 
             try {
-                const response = await fetch(`${API_URL}/api/sync`, {
+                const response = await fetch(API_URL + '/api/sync', {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`
                     }
@@ -496,7 +537,7 @@
         // Refresh Access Token
         async function refreshAccessToken() {
             try {
-                const response = await fetch(`${API_URL}/identity/connect/token`, {
+                const response = await fetch(API_URL + '/identity/connect/token', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -538,6 +579,13 @@
         } else {
             showLoginForm();
         }
+
+        // Test API on load
+        testApiConnection().then(ok => {
+            if (!ok) {
+                console.warn('API connection test failed - API functions may not be configured');
+            }
+        });
     </script>
 </body>
 </html>

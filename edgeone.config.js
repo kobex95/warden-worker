@@ -8,22 +8,24 @@ export default {
     SERVER_URL: process.env.SERVER_URL,
   },
 
-  // 函数配置
-  functions: {
-    api: {
-      handler: 'api/index.js',
-      route: '/api/*',
-    },
-    identity: {
-      handler: 'api/index.js',
-      route: '/identity/*',
-    },
-  },
-
-  // 静态文件配置
+  // 静态文件配置（优先级最低）
   static: {
     directory: 'frontend',
     route: '/',
+  },
+
+  // 函数配置（优先级更高）
+  functions: {
+    // API 路由
+    api: {
+      handler: 'api/index.js',
+      route: '/api',
+    },
+    // Identity 路由
+    identity: {
+      handler: 'api/index.js',
+      route: '/identity',
+    },
   },
 
   // 构建配置
