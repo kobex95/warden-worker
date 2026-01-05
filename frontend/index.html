@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Warden - 密码管理器</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -125,7 +126,7 @@
         }
 
         .hidden {
-            display: none;
+            display: none !important;
         }
 
         .error {
@@ -147,6 +148,12 @@
             font-size: 14px;
         }
 
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Vault styles */
         .vault-container {
             max-width: 800px;
         }
@@ -205,6 +212,12 @@
 
         .vault-item p {
             font-size: 14px;
+            color: #666;
+        }
+
+        .empty-vault {
+            text-align: center;
+            padding: 40px;
             color: #666;
         }
     </style>
@@ -285,8 +298,12 @@
     </div>
 
     <script>
-        // API Configuration - 使用相对路径
-        const API_URL = window.location.origin;
+        // Supabase 配置
+        const SUPABASE_URL = 'https://jxngfaycacjetpiqttwb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_Nwca-b4HH9JFDInZgyrAuQ_C0wsGnhs';
+
+        // 创建 Supabase 客户端
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // DOM Elements
         const loginForm = document.getElementById('loginForm');
@@ -296,8 +313,7 @@
         const registerFormElement = document.getElementById('registerFormElement');
 
         // State
-        let accessToken = localStorage.getItem('access_token');
-        let refreshToken = localStorage.getItem('refresh_token');
+        let currentUser = null;
 
         // Show/Hide Forms
         function showLoginForm() {
@@ -324,27 +340,25 @@
             const el = document.getElementById(elementId);
             el.textContent = message;
             el.classList.remove('hidden');
-            console.error(message);
+            setTimeout(() => el.classList.add('hidden'), 5000);
         }
 
-        // Test API connection
-        async function testApiConnection() {
-            try {
-                console.log('Testing API connection to:', API_URL + '/api/health');
-                const response = await fetch(API_URL + '/api/health', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                console.log('Health check response:', response.status, response.statusText);
-                const data = await response.json();
-                console.log('Health check data:', data);
-                return response.ok;
-            } catch (error) {
-                console.error('API connection test failed:', error);
-                return false;
-            }
+        // Helper function to show success
+        function showSuccess(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3000);
+        }
+
+        // Simple hash function for demo (in production, use PBKDF2)
+        async function simpleHash(password) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
         }
 
         // Register Handler
@@ -355,12 +369,10 @@
             const email = document.getElementById('registerEmail').value;
             const password = document.getElementById('registerPassword').value;
             const confirmPassword = document.getElementById('registerConfirmPassword').value;
-            const errorDiv = document.getElementById('registerError');
-            const successDiv = document.getElementById('registerSuccess');
 
             // Clear previous messages
-            errorDiv.classList.add('hidden');
-            successDiv.classList.add('hidden');
+            document.getElementById('registerError').classList.add('hidden');
+            document.getElementById('registerSuccess').classList.add('hidden');
 
             // Validation
             if (password !== confirmPassword) {
@@ -374,56 +386,43 @@
             }
 
             try {
-                // Test API first
-                const apiOk = await testApiConnection();
-                if (!apiOk) {
-                    showError('registerError', '无法连接到服务器，请检查网络或稍后重试');
-                    return;
-                }
+                // Hash the password
+                const passwordHash = await simpleHash(password);
+                const userId = crypto.randomUUID();
+                const now = new Date().toISOString();
 
                 console.log('Registering user:', email);
-                console.log('API URL:', API_URL + '/identity/accounts/register/finish');
 
-                const registerData = {
-                    name: name || null,
-                    email: email,
-                    masterPasswordHash: password,
-                    masterPasswordHint: null,
-                    userSymmetricKey: 'demo-key-' + Date.now(),
-                    userAsymmetricKeys: {
-                        publicKey: 'demo-public-key-' + Date.now(),
-                        encryptedPrivateKey: 'demo-private-key-' + Date.now()
-                    },
-                    kdf: 0,
-                    kdfIterations: 600000
-                };
+                // Insert user into Supabase
+                const { data, error } = await supabase
+                    .from('users')
+                    .insert({
+                        id: userId,
+                        name: name || null,
+                        email: email.toLowerCase(),
+                        email_verified: true,
+                        master_password_hash: passwordHash,
+                        master_password_hint: null,
+                        key: 'demo-key-' + Date.now(),
+                        private_key: 'demo-private-key-' + Date.now(),
+                        public_key: 'demo-public-key-' + Date.now(),
+                        kdf_type: 0,
+                        kdf_iterations: 600000,
+                        security_stamp: crypto.randomUUID(),
+                        created_at: now,
+                        updated_at: now
+                    })
+                    .select();
 
-                console.log('Request payload:', registerData);
-
-                const response = await fetch(API_URL + '/identity/accounts/register/finish', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(registerData)
-                });
-
-                console.log('Register response status:', response.status);
-                console.log('Register response ok:', response.ok);
-
-                const data = await response.json();
-                console.log('Register response data:', data);
-
-                if (response.ok) {
-                    successDiv.textContent = '注册成功！请登录';
-                    successDiv.classList.remove('hidden');
-
+                if (error) {
+                    console.error('Registration error:', error);
+                    showError('registerError', '注册失败：' + error.message);
+                } else {
+                    console.log('Registration success:', data);
+                    showSuccess('registerSuccess', '注册成功！请登录');
                     setTimeout(() => {
                         showLoginForm();
-                        successDiv.classList.add('hidden');
                     }, 2000);
-                } else {
-                    showError('registerError', data.error || '注册失败：' + response.statusText);
                 }
             } catch (error) {
                 console.error('Register error:', error);
@@ -437,36 +436,30 @@
 
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
-            const errorDiv = document.getElementById('loginError');
 
-            errorDiv.classList.add('hidden');
+            document.getElementById('loginError').classList.add('hidden');
 
             try {
+                // Hash the password
+                const passwordHash = await simpleHash(password);
+
                 console.log('Logging in:', email);
 
-                const response = await fetch(API_URL + '/identity/connect/token', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        grant_type: 'password',
-                        username: email,
-                        password: password
-                    })
-                });
+                // Query user from Supabase
+                const { data: user, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('email', email.toLowerCase())
+                    .eq('master_password_hash', passwordHash)
+                    .single();
 
-                const data = await response.json();
-                console.log('Login response:', data);
-
-                if (response.ok) {
-                    localStorage.setItem('access_token', data.access_token);
-                    localStorage.setItem('refresh_token', data.refresh_token);
-                    accessToken = data.access_token;
-                    refreshToken = data.refresh_token;
-                    showVault();
+                if (error || !user) {
+                    console.error('Login error:', error);
+                    showError('loginError', '邮箱或密码错误');
                 } else {
-                    showError('loginError', data.error || '登录失败');
+                    console.log('Login success:', user);
+                    currentUser = user;
+                    showVault();
                 }
             } catch (error) {
                 console.error('Login error:', error);
@@ -477,28 +470,32 @@
         // Load Vault
         async function loadVault() {
             const vaultContent = document.getElementById('vaultContent');
+            vaultContent.innerHTML = '<div class="empty-vault">加载中...</div>';
 
             try {
-                const response = await fetch(API_URL + '/api/sync', {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    }
-                });
+                console.log('Loading vault for user:', currentUser.id);
 
-                const data = await response.json();
+                // Fetch ciphers
+                const { data: ciphers, error: ciphersError } = await supabase
+                    .from('ciphers')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
 
-                if (response.ok) {
-                    displayVault(data);
+                // Fetch folders
+                const { data: folders, error: foldersError } = await supabase
+                    .from('folders')
+                    .select('*')
+                    .eq('user_id', currentUser.id);
+
+                if (ciphersError || foldersError) {
+                    console.error('Load vault error:', ciphersError || foldersError);
+                    vaultContent.innerHTML = '<div class="empty-vault">加载失败，请刷新页面</div>';
                 } else {
-                    if (response.status === 401) {
-                        await refreshAccessToken();
-                        loadVault();
-                    } else {
-                        console.error('Sync error:', data);
-                    }
+                    displayVault({ Ciphers: ciphers || [], Folders: folders || [] });
                 }
             } catch (error) {
                 console.error('Load vault error:', error);
+                vaultContent.innerHTML = '<div class="empty-vault">加载失败，请刷新页面</div>';
             }
         }
 
@@ -508,7 +505,7 @@
 
             if (!data.Ciphers || data.Ciphers.length === 0) {
                 vaultContent.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #666;">
+                    <div class="empty-vault">
                         <p>📭 密码库为空</p>
                         <p style="margin-top: 8px; font-size: 14px;">点击下方按钮添加您的第一个密码</p>
                     </div>
@@ -516,12 +513,15 @@
                 return;
             }
 
-            vaultContent.innerHTML = data.Ciphers.map(cipher => `
-                <div class="vault-item" onclick="viewCipher('${cipher.id}')">
-                    <h3>${cipher.data?.name || '未命名'}</h3>
-                    <p>${cipher.data?.login?.username || '无用户名'}</p>
-                </div>
-            `).join('');
+            vaultContent.innerHTML = data.Ciphers.map(cipher => {
+                const cipherData = typeof cipher.data === 'string' ? JSON.parse(cipher.data) : cipher.data;
+                return `
+                    <div class="vault-item" onclick="viewCipher('${cipher.id}')">
+                        <h3>${cipherData.name || '未命名'}</h3>
+                        <p>${cipherData.login?.username || '无用户名'}</p>
+                    </div>
+                `;
+            }).join('');
         }
 
         // View Cipher
@@ -530,62 +530,84 @@
         }
 
         // Add New Item
-        function addNewItem() {
-            alert('添加新密码功能开发中...');
-        }
+        async function addNewItem() {
+            const name = prompt('输入密码项名称：');
+            if (!name) return;
 
-        // Refresh Access Token
-        async function refreshAccessToken() {
+            const username = prompt('输入用户名：');
+            const password = prompt('输入密码：');
+
+            if (!username || !password) {
+                alert('用户名和密码不能为空');
+                return;
+            }
+
             try {
-                const response = await fetch(API_URL + '/identity/connect/token', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        grant_type: 'refresh_token',
-                        refresh_token: refreshToken
-                    })
-                });
+                const now = new Date().toISOString();
+                const cipherId = crypto.randomUUID();
 
-                const data = await response.json();
+                const cipherData = {
+                    name: name,
+                    notes: null,
+                    login: { username: username, password: password },
+                    card: null,
+                    identity: null,
+                    secureNote: null,
+                    fields: null,
+                    passwordHistory: null,
+                    reprompt: null
+                };
 
-                if (response.ok) {
-                    localStorage.setItem('access_token', data.access_token);
-                    localStorage.setItem('refresh_token', data.refresh_token);
-                    accessToken = data.access_token;
-                    refreshToken = data.refresh_token;
+                const { error } = await supabase
+                    .from('ciphers')
+                    .insert({
+                        id: cipherId,
+                        user_id: currentUser.id,
+                        organization_id: null,
+                        type: 1,
+                        data: JSON.stringify(cipherData),
+                        favorite: false,
+                        folder_id: null,
+                        deleted_at: null,
+                        created_at: now,
+                        updated_at: now
+                    });
+
+                if (error) {
+                    console.error('Add cipher error:', error);
+                    alert('添加失败：' + error.message);
                 } else {
-                    logout();
+                    alert('添加成功！');
+                    loadVault();
                 }
             } catch (error) {
-                console.error('Refresh token error:', error);
-                logout();
+                console.error('Add cipher error:', error);
+                alert('添加失败：' + error.message);
             }
         }
 
         // Logout
         function logout() {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            accessToken = null;
-            refreshToken = null;
+            currentUser = null;
             showLoginForm();
         }
 
         // Initialize
-        if (accessToken) {
-            showVault();
-        } else {
-            showLoginForm();
-        }
+        showLoginForm();
 
-        // Test API on load
-        testApiConnection().then(ok => {
-            if (!ok) {
-                console.warn('API connection test failed - API functions may not be configured');
+        // Test Supabase connection
+        (async () => {
+            try {
+                const { data, error } = await supabase.from('users').select('count').limit(1);
+                if (error) {
+                    console.error('Supabase connection error:', error);
+                } else {
+                    console.log('Supabase connected successfully');
+                }
+            } catch (error) {
+                console.error('Supabase connection error:', error);
             }
-        });
+        })();
     </script>
 </body>
 </html>
