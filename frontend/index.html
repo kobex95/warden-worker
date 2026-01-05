@@ -303,7 +303,7 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_Nwca-b4HH9JFDInZgyrAuQ_C0wsGnhs';
 
         // 创建 Supabase 客户端
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // DOM Elements
         const loginForm = document.getElementById('loginForm');
@@ -386,15 +386,20 @@
             }
 
             try {
+                console.log('开始注册流程...');
+                console.log('Supabase client:', supabase ? '已初始化' : '未初始化');
+
                 // Hash the password
                 const passwordHash = await simpleHash(password);
                 const userId = crypto.randomUUID();
                 const now = new Date().toISOString();
 
                 console.log('Registering user:', email);
+                console.log('User ID:', userId);
+                console.log('Password hash:', passwordHash);
 
                 // Insert user into Supabase
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('users')
                     .insert({
                         id: userId,
@@ -414,8 +419,11 @@
                     })
                     .select();
 
+                console.log('Insert response:', { data, error });
+
                 if (error) {
                     console.error('Registration error:', error);
+                    console.error('Error details:', error.code, error.message, error.hint);
                     showError('registerError', '注册失败：' + error.message);
                 } else {
                     console.log('Registration success:', data);
@@ -426,6 +434,7 @@
                 }
             } catch (error) {
                 console.error('Register error:', error);
+                console.error('Error stack:', error.stack);
                 showError('registerError', '网络错误：' + error.message);
             }
         });
@@ -446,7 +455,7 @@
                 console.log('Logging in:', email);
 
                 // Query user from Supabase
-                const { data: user, error } = await supabase
+                const { data: user, error } = await supabaseClient
                     .from('users')
                     .select('*')
                     .eq('email', email.toLowerCase())
@@ -476,13 +485,13 @@
                 console.log('Loading vault for user:', currentUser.id);
 
                 // Fetch ciphers
-                const { data: ciphers, error: ciphersError } = await supabase
+                const { data: ciphers, error: ciphersError } = await supabaseClient
                     .from('ciphers')
                     .select('*')
                     .eq('user_id', currentUser.id);
 
                 // Fetch folders
-                const { data: folders, error: foldersError } = await supabase
+                const { data: folders, error: foldersError } = await supabaseClient
                     .from('folders')
                     .select('*')
                     .eq('user_id', currentUser.id);
@@ -558,7 +567,7 @@
                     reprompt: null
                 };
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('ciphers')
                     .insert({
                         id: cipherId,
@@ -598,7 +607,7 @@
         // Test Supabase connection
         (async () => {
             try {
-                const { data, error } = await supabase.from('users').select('count').limit(1);
+                const { data, error } = await supabaseClient.from('users').select('count').limit(1);
                 if (error) {
                     console.error('Supabase connection error:', error);
                 } else {
