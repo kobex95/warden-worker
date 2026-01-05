@@ -16,10 +16,15 @@ export default {
 
   // 函数配置（优先级更高）
   functions: {
-    // 主处理函数 - 处理所有 API 和 identity 请求
-    handler: {
-      handler: 'api/index.js',
-      // 不指定 route，让它捕获所有请求
+    // API 路由
+    api: {
+      handler: 'node-functions/index.js',
+      route: '/api',
+    },
+    // Identity 路由
+    identity: {
+      handler: 'node-functions/index.js',
+      route: '/identity',
     },
   },
 
