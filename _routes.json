@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "path": "/api/*",
+      "function": "api"
+    },
+    {
+      "path": "/identity/*",
+      "function": "identity"
+    },
+    {
+      "path": "/*",
+      "file": "index.html"
+    }
+  ]
+}

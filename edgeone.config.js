@@ -14,19 +14,8 @@ export default {
     route: '/',
   },
 
-  // 函数配置 - 使用专门的处理器
-  functions: {
-    // API 路由
-    api: {
-      handler: 'edge-functions/api.js',
-      route: '/api',
-    },
-    // Identity 路由
-    identity: {
-      handler: 'edge-functions/identity.js',
-      route: '/identity',
-    },
-  },
+  // 函数目录
+  functions: 'edge-functions',
 
   // 构建配置
   build: {
