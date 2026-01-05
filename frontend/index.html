@@ -220,6 +220,151 @@
             padding: 40px;
             color: #666;
         }
+
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            font-size: 20px;
+            color: #333;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .close-modal:hover {
+            color: #333;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e1e8ed;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 500;
+            color: #666;
+            flex: 1;
+        }
+
+        .detail-value {
+            color: #333;
+            flex: 2;
+            text-align: right;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: none;
+            border: none;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+            padding: 4px 8px;
+        }
+
+        .copy-btn:hover {
+            color: #764ba2;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-actions button {
+            flex: 1;
+        }
+
+        /* Search styles */
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Password Generator */
+        .password-display {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 18px;
+            word-break: break-all;
+        }
+
+        .generator-controls {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .generator-controls label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .generator-controls input[type="range"] {
+            flex: 1;
+        }
     </style>
 </head>
 <body>
@@ -289,11 +434,66 @@
                 <button class="logout-btn" onclick="logout()">退出登录</button>
             </div>
 
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 搜索密码项..." oninput="searchVault()">
+            </div>
+
             <div id="vaultContent" class="vault-list">
                 <!-- Vault items will be loaded here -->
             </div>
 
-            <button class="btn" onclick="addNewItem()" style="margin-top: 20px;">+ 添加新密码</button>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn" onclick="addNewItem()">+ 添加新密码</button>
+                <button class="btn btn-secondary" onclick="showPasswordGenerator()">🎲 生成密码</button>
+            </div>
+        </div>
+
+        <!-- Password Detail Modal -->
+        <div id="detailModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">密码详情</h3>
+                    <button class="close-modal" onclick="closeModal()">&times;</button>
+                </div>
+                <div id="modalContent"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="deleteCipher()">删除</button>
+                    <button class="btn" onclick="closeModal()">关闭</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Password Generator Modal -->
+        <div id="generatorModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>密码生成器</h3>
+                    <button class="close-modal" onclick="closeGenerator()">&times;</button>
+                </div>
+                <div id="generatedPassword" class="password-display">点击生成</div>
+                <div class="generator-controls">
+                    <label>
+                        长度: <span id="lengthValue">16</span>
+                        <input type="range" id="passwordLength" min="8" max="64" value="16" oninput="updateLengthValue()">
+                    </label>
+                    <label>
+                        <input type="checkbox" id="useUppercase" checked> 大写字母 (A-Z)
+                    </label>
+                    <label>
+                        <input type="checkbox" id="useLowercase" checked> 小写字母 (a-z)
+                    </label>
+                    <label>
+                        <input type="checkbox" id="useNumbers" checked> 数字 (0-9)
+                    </label>
+                    <label>
+                        <input type="checkbox" id="useSymbols" checked> 特殊字符 (!@#$%)
+                    </label>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn" onclick="generatePassword()">生成密码</button>
+                    <button class="btn btn-secondary" onclick="copyGeneratedPassword()">复制</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -314,6 +514,8 @@
 
         // State
         let currentUser = null;
+        let currentCipher = null;
+        let allCiphers = [];
 
         // Show/Hide Forms
         function showLoginForm() {
@@ -510,19 +712,25 @@
 
         // Display Vault
         function displayVault(data) {
+            allCiphers = data.Ciphers || [];
+            renderVault(allCiphers);
+        }
+
+        // Render Vault Items
+        function renderVault(ciphers) {
             const vaultContent = document.getElementById('vaultContent');
 
-            if (!data.Ciphers || data.Ciphers.length === 0) {
+            if (!ciphers || ciphers.length === 0) {
                 vaultContent.innerHTML = `
                     <div class="empty-vault">
-                        <p>📭 密码库为空</p>
-                        <p style="margin-top: 8px; font-size: 14px;">点击下方按钮添加您的第一个密码</p>
+                        <p>📭 ${allCiphers.length === 0 ? '密码库为空' : '未找到匹配项'}</p>
+                        <p style="margin-top: 8px; font-size: 14px;">${allCiphers.length === 0 ? '点击下方按钮添加您的第一个密码' : '尝试其他搜索词'}</p>
                     </div>
                 `;
                 return;
             }
 
-            vaultContent.innerHTML = data.Ciphers.map(cipher => {
+            vaultContent.innerHTML = ciphers.map(cipher => {
                 const cipherData = typeof cipher.data === 'string' ? JSON.parse(cipher.data) : cipher.data;
                 return `
                     <div class="vault-item" onclick="viewCipher('${cipher.id}')">
@@ -533,9 +741,176 @@
             }).join('');
         }
 
+        // Search Vault
+        function searchVault() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            if (!searchTerm) {
+                renderVault(allCiphers);
+                return;
+            }
+
+            const filtered = allCiphers.filter(cipher => {
+                const cipherData = typeof cipher.data === 'string' ? JSON.parse(cipher.data) : cipher.data;
+                const name = (cipherData.name || '').toLowerCase();
+                const username = (cipherData.login?.username || '').toLowerCase();
+                return name.includes(searchTerm) || username.includes(searchTerm);
+            });
+
+            renderVault(filtered);
+        }
+
         // View Cipher
         function viewCipher(id) {
-            alert('查看密码详情功能开发中...');
+            const cipher = allCiphers.find(c => c.id === id);
+            if (!cipher) return;
+
+            currentCipher = cipher;
+            const cipherData = typeof cipher.data === 'string' ? JSON.parse(cipher.data) : cipher.data;
+
+            document.getElementById('modalTitle').textContent = cipherData.name || '未命名';
+            document.getElementById('modalContent').innerHTML = `
+                <div class="detail-row">
+                    <div class="detail-label">用户名</div>
+                    <div class="detail-value">
+                        ${cipherData.login?.username || '-'}
+                        <button class="copy-btn" onclick="copyToClipboard('${cipherData.login?.username || ''}')">复制</button>
+                    </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">密码</div>
+                    <div class="detail-value">
+                        <span id="cipherPassword">••••••••</span>
+                        <button class="copy-btn" onclick="togglePasswordVisibility()">显示</button>
+                        <button class="copy-btn" onclick="copyToClipboard('${cipherData.login?.password || ''}')">复制</button>
+                    </div>
+                </div>
+                ${cipherData.notes ? `
+                <div class="detail-row">
+                    <div class="detail-label">备注</div>
+                    <div class="detail-value">${cipherData.notes}</div>
+                </div>
+                ` : ''}
+                <div class="detail-row">
+                    <div class="detail-label">创建时间</div>
+                    <div class="detail-value">${new Date(cipher.created_at).toLocaleString('zh-CN')}</div>
+                </div>
+            `;
+
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        // Toggle Password Visibility
+        function togglePasswordVisibility() {
+            const passwordSpan = document.getElementById('cipherPassword');
+            const cipherData = typeof currentCipher.data === 'string' ? JSON.parse(currentCipher.data) : currentCipher.data;
+            const password = cipherData.login?.password || '';
+
+            if (passwordSpan.textContent === '••••••••') {
+                passwordSpan.textContent = password;
+            } else {
+                passwordSpan.textContent = '••••••••';
+            }
+        }
+
+        // Copy to Clipboard
+        async function copyToClipboard(text) {
+            if (!text) {
+                alert('没有可复制的内容');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                alert('已复制到剪贴板！');
+            } catch (error) {
+                alert('复制失败，请手动复制');
+            }
+        }
+
+        // Close Modal
+        function closeModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+            currentCipher = null;
+        }
+
+        // Delete Cipher
+        async function deleteCipher() {
+            if (!currentCipher) return;
+
+            if (!confirm('确定要删除这个密码项吗？此操作不可恢复。')) {
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from('ciphers')
+                    .delete()
+                    .eq('id', currentCipher.id);
+
+                if (error) {
+                    alert('删除失败：' + error.message);
+                } else {
+                    alert('删除成功！');
+                    closeModal();
+                    loadVault();
+                }
+            } catch (error) {
+                alert('删除失败：' + error.message);
+            }
+        }
+
+        // Show Password Generator
+        function showPasswordGenerator() {
+            document.getElementById('generatorModal').classList.remove('hidden');
+            generatePassword();
+        }
+
+        // Close Generator
+        function closeGenerator() {
+            document.getElementById('generatorModal').classList.add('hidden');
+        }
+
+        // Update Length Value Display
+        function updateLengthValue() {
+            document.getElementById('lengthValue').textContent = document.getElementById('passwordLength').value;
+        }
+
+        // Generate Password
+        function generatePassword() {
+            const length = parseInt(document.getElementById('passwordLength').value);
+            const useUppercase = document.getElementById('useUppercase').checked;
+            const useLowercase = document.getElementById('useLowercase').checked;
+            const useNumbers = document.getElementById('useNumbers').checked;
+            const useSymbols = document.getElementById('useSymbols').checked;
+
+            let chars = '';
+            if (useUppercase) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            if (useLowercase) chars += 'abcdefghijklmnopqrstuvwxyz';
+            if (useNumbers) chars += '0123456789';
+            if (useSymbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+            if (!chars) {
+                document.getElementById('generatedPassword').textContent = '请至少选择一种字符类型';
+                return;
+            }
+
+            let password = '';
+            const array = new Uint32Array(length);
+            crypto.getRandomValues(array);
+            for (let i = 0; i < length; i++) {
+                password += chars[array[i] % chars.length];
+            }
+
+            document.getElementById('generatedPassword').textContent = password;
+        }
+
+        // Copy Generated Password
+        async function copyGeneratedPassword() {
+            const password = document.getElementById('generatedPassword').textContent;
+            if (password === '点击生成' || password === '请至少选择一种字符类型') {
+                alert('请先生成密码');
+                return;
+            }
+            await copyToClipboard(password);
         }
 
         // Add New Item
