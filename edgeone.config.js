@@ -18,12 +18,12 @@ export default {
   functions: {
     // API 路由
     api: {
-      handler: 'node-functions/api.js',
+      handler: 'edge-functions/api.js',
       route: '/api',
     },
     // Identity 路由
     identity: {
-      handler: 'node-functions/identity.js',
+      handler: 'edge-functions/identity.js',
       route: '/identity',
     },
   },
